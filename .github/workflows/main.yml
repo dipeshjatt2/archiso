@@ -1,0 +1,13 @@
+name: Build BhagwaOS ISO
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build ISO
+        uses: antony-jr/arch-iso-action@v5 # Search for the latest 'arch-iso-action' fork
+        with:
+          preset: 'releng'
+          name: 'BhagwaOS'
