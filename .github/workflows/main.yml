@@ -11,6 +11,7 @@ jobs:
       - name: Setup Arch Linux Environment
         uses: RangHo/setup-arch@v1
         with:
+          # Required tools for the builder host
           packages: archiso git base-devel wget
 
       - name: Build BhagwaOS ISO
@@ -20,21 +21,31 @@ jobs:
           sudo pacman-key --init
           sudo pacman-key --populate archlinux
 
-          # 2. Add Chaotic-AUR
+          # 2. Add Chaotic-AUR to Host
           echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" | sudo tee -a /etc/pacman.conf
           sudo pacman -Sy --noconfirm
           sudo pacman -S --noconfirm chaotic-keyring
 
-          # 3. FIX: Prepare the profile with missing boot files
-          # This copies the 'syslinux' and 'efiboot' folders required by mkarchiso
+          # 3. Prepare the profile with missing boot files
+          # Copying default boot configurations from the archiso templates
           cp -rv /usr/share/archiso/configs/releng/* ./profile/
           
-          # Restore your custom configs (so the cp doesn't overwrite your Bhagwa settings)
+          # Restore your custom configs so the cp doesn't overwrite your Bhagwa settings
           git checkout ./profile/packages.x86_64
           git checkout ./profile/profiledef.sh
           git checkout ./profile/pacman.conf
 
-          # 4. Build the ISO
+          # 4. Fix Directory Structure & Shadow file
+          # This prevents the "Outside of valid path" error for permissions
+          mkdir -p profile/airootfs/etc/sudoers.d
+          mkdir -p profile/airootfs/root
+          if [ ! -f profile/airootfs/etc/shadow ]; then
+            mkdir -p profile/airootfs/etc
+            echo "root::14871::::::" | sudo tee profile/airootfs/etc/shadow
+          fi
+
+          # 5. Build the ISO
+          # mkarchiso MUST run with sudo to handle loop device mounting
           mkdir -p ./output
           sudo mkarchiso -v -w /tmp/archiso-tmp -o ./output ./profile
 
