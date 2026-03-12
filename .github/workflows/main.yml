@@ -11,23 +11,26 @@ jobs:
       - name: Setup Arch Linux Environment
         uses: RangHo/setup-arch@v1
         with:
-          # We need these packages to build the ISO
-          packages: archiso git base-devel
+          # Required tools for the builder host
+          packages: archiso git base-devel wget
 
       - name: Build BhagwaOS ISO
         shell: arch.sh {0}
         run: |
-          # 1. Initialize keys
-          pacman-key --init
-          pacman-key --populate archlinux
+          # 1. Initialize host keys with sudo
+          sudo pacman-key --init
+          sudo pacman-key --populate archlinux
 
-          # 2. Add Chaotic-AUR for Calamares
-          echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" >> /etc/pacman.conf
-          pacman -Sy --noconfirm
+          # 2. Add Chaotic-AUR to the builder host
+          # This allows the host to resolve 'calamares' during the build process
+          echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" | sudo tee -a /etc/pacman.conf
+          sudo pacman -Sy --noconfirm
+          sudo pacman -S --noconfirm chaotic-keyring
 
           # 3. Build the ISO
-          # -v (Verbose), -w (Work dir), -o (Output dir)
-          mkarchiso -v -w /tmp/archiso-tmp -o ./output ./profile
+          # mkarchiso MUST run with sudo to handle loop device mounting
+          mkdir -p ./output
+          sudo mkarchiso -v -w /tmp/archiso-tmp -o ./output ./profile
 
       - name: Upload BhagwaOS ISO
         uses: actions/upload-artifact@v4
