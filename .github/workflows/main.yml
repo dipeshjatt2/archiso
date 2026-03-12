@@ -20,24 +20,30 @@ jobs:
           sudo pacman-key --init
           sudo pacman-key --populate archlinux
 
-          # 2. Add Chaotic-AUR to Host (Runner Environment)
-          echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" | sudo tee -a /etc/pacman.conf
+          # 2. Sync standard repositories
           sudo pacman -Sy --noconfirm
-          sudo pacman -S --noconfirm chaotic-keyring
 
-          # 3. Prepare Profile
+          # 3. Prepare Profile Structure
+          # Copying the official Arch templates
           cp -rv /usr/share/archiso/configs/releng/* ./profile/
+          
+          # Restore your custom files from your repository
           git checkout ./profile/packages.x86_64
           git checkout ./profile/profiledef.sh
           git checkout ./profile/pacman.conf
 
-          # 4. FIX: Force Chaotic-AUR into the ISO's pacman.conf
-          # Sometimes the 'git checkout' doesn't overwrite correctly if the file was missing
-          if ! grep -q "chaotic-aur" profile/pacman.conf; then
-            echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" >> profile/pacman.conf
-          fi
+          # 4. Cleanup: Remove any leftover Calamares/Chaotic references
+          # This ensures the build doesn't fail if you forgot to edit the file manually
+          sed -i '/calamares/d' profile/packages.x86_64
+          sed -i '/chaotic/d' profile/packages.x86_64
 
-          # 5. Fix Directory Structure
+          # 5. Bootloader Sanity Check
+          # Ensuring essential boot packages are present for validation
+          for pkg in syslinux memtest86+ memtest86+-efi edk2-shell; do
+            grep -qxF "$pkg" profile/packages.x86_64 || echo "$pkg" >> profile/packages.x86_64
+          done
+
+          # 6. Fix Directory Structure
           mkdir -p profile/airootfs/etc/sudoers.d
           mkdir -p profile/airootfs/root
           if [ ! -f profile/airootfs/etc/shadow ]; then
@@ -45,7 +51,7 @@ jobs:
             echo "root::14871::::::" | sudo tee profile/airootfs/etc/shadow
           fi
 
-          # 6. Build the ISO
+          # 7. Build the ISO
           mkdir -p ./output
           sudo mkarchiso -v -w /tmp/archiso-tmp -o ./output ./profile
 
