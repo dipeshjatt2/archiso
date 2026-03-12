@@ -11,7 +11,6 @@ jobs:
       - name: Setup Arch Linux Environment
         uses: RangHo/setup-arch@v1
         with:
-          # Required tools for the builder host
           packages: archiso git base-devel wget
 
       - name: Build BhagwaOS ISO
@@ -21,22 +20,24 @@ jobs:
           sudo pacman-key --init
           sudo pacman-key --populate archlinux
 
-          # 2. Add Chaotic-AUR to Host
+          # 2. Add Chaotic-AUR to Host (Runner Environment)
           echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" | sudo tee -a /etc/pacman.conf
           sudo pacman -Sy --noconfirm
           sudo pacman -S --noconfirm chaotic-keyring
 
-          # 3. Prepare the profile with missing boot files
-          # Copying default boot configurations from the archiso templates
+          # 3. Prepare Profile
           cp -rv /usr/share/archiso/configs/releng/* ./profile/
-          
-          # Restore your custom configs so the cp doesn't overwrite your Bhagwa settings
           git checkout ./profile/packages.x86_64
           git checkout ./profile/profiledef.sh
           git checkout ./profile/pacman.conf
 
-          # 4. Fix Directory Structure & Shadow file
-          # This prevents the "Outside of valid path" error for permissions
+          # 4. FIX: Force Chaotic-AUR into the ISO's pacman.conf
+          # Sometimes the 'git checkout' doesn't overwrite correctly if the file was missing
+          if ! grep -q "chaotic-aur" profile/pacman.conf; then
+            echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" >> profile/pacman.conf
+          fi
+
+          # 5. Fix Directory Structure
           mkdir -p profile/airootfs/etc/sudoers.d
           mkdir -p profile/airootfs/root
           if [ ! -f profile/airootfs/etc/shadow ]; then
@@ -44,8 +45,7 @@ jobs:
             echo "root::14871::::::" | sudo tee profile/airootfs/etc/shadow
           fi
 
-          # 5. Build the ISO
-          # mkarchiso MUST run with sudo to handle loop device mounting
+          # 6. Build the ISO
           mkdir -p ./output
           sudo mkarchiso -v -w /tmp/archiso-tmp -o ./output ./profile
 
