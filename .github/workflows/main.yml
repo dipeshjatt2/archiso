@@ -11,24 +11,30 @@ jobs:
       - name: Setup Arch Linux Environment
         uses: RangHo/setup-arch@v1
         with:
-          # Required tools for the builder host
           packages: archiso git base-devel wget
 
       - name: Build BhagwaOS ISO
         shell: arch.sh {0}
         run: |
-          # 1. Initialize host keys with sudo
+          # 1. Initialize Keys
           sudo pacman-key --init
           sudo pacman-key --populate archlinux
 
-          # 2. Add Chaotic-AUR to the builder host
-          # This allows the host to resolve 'calamares' during the build process
+          # 2. Add Chaotic-AUR
           echo -e "\n[chaotic-aur]\nSigLevel = Never\nServer = https://cdn-mirror.chaotic.cx/\$repo/\$arch" | sudo tee -a /etc/pacman.conf
           sudo pacman -Sy --noconfirm
           sudo pacman -S --noconfirm chaotic-keyring
 
-          # 3. Build the ISO
-          # mkarchiso MUST run with sudo to handle loop device mounting
+          # 3. FIX: Prepare the profile with missing boot files
+          # This copies the 'syslinux' and 'efiboot' folders required by mkarchiso
+          cp -rv /usr/share/archiso/configs/releng/* ./profile/
+          
+          # Restore your custom configs (so the cp doesn't overwrite your Bhagwa settings)
+          git checkout ./profile/packages.x86_64
+          git checkout ./profile/profiledef.sh
+          git checkout ./profile/pacman.conf
+
+          # 4. Build the ISO
           mkdir -p ./output
           sudo mkarchiso -v -w /tmp/archiso-tmp -o ./output ./profile
 
