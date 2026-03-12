@@ -1,4 +1,8 @@
 base
+syslinux
+memtest86+
+memtest86+-efi
+edk2-shell
 linux
 linux-firmware
 grub
